@@ -46,7 +46,7 @@ FitFindr takes a plain-language thrifting request such as "a vintage graphic tee
 Finds listings that match a description, optionally limited by size and a price ceiling.
 - **Inputs:** `description` (str), `size` (str or None), `max_price` (float or None).
 - **Returns:**
-A list of full listing dicts (id, title, description, category, style_tags, size, condition, price, colors, brand, platform), best match first, at most config.SEARCH_RESULT_LIMIT items. A listing's score is the number of words from `description` that appear in its title, description, style_tags, category, colors or brand. Listings scoring zero are dropped. A size matches when the requested size, uppercased, equals one of the listing's size tokens, where the size string is split on spaces, slashes and parentheses. So "M" matches "S/M" and "M", but "L" does not match "XL (oversized)", and "S" does not match "US 9". `max_price` is inclusive. A size or price of None skips that filter.
+A list of full listing dicts (id, title, description, category, style_tags, size, condition, price, colors, brand, platform), best match first, at most config.SEARCH_RESULT_LIMIT items. A listing's score is the number of words from `description` that appear in its title, description, style_tags, category, colors or brand. Words that appear in a listing's title count double. Listings scoring zero are dropped. A size matches when the requested size, uppercased, equals one of the listing's size tokens, where the size string is split on spaces, slashes and parentheses. So "M" matches "S/M" and "M", but "L" does not match "XL (oversized)", and "S" does not match "US 9". `max_price` is inclusive. A size or price of None skips that filter.
 - **When it has nothing:**
 An empty list `[]`, never None and never an exception.
 
@@ -74,7 +74,7 @@ An empty list `[]`, never None and never an exception.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex. It pulls the price and the size out of the request, and treats the rest as the search words.
 
 **What moves through the session:** `query`, then `parsed` (description, size, max_price), then `search_results`, then `selected_item`, then `outfit_suggestion`, then `fit_card`. `error` is set only when the run ends early.
 
@@ -88,6 +88,19 @@ An empty list `[]`, never None and never an exception.
      2. Your three per-tool terminal tests — the command and what it printed. -->
 
 **One full query**
+Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Hey babe! That Y2K butterfly baby tee is a total steal. Here are two cute ways to style it with your closet:
+
+**Outfit 1: Casual Y2K Streetwear**
+Pair the baby tee with your *Baggy straight-leg jeans, dark wash*. Layer the *Black cropped zip hoodie* over top, leaving it unzipped. Slip on the *Chunky white sneakers* and finish with the *Black crossbody bag*. 
+
+**Outfit 2: Sweet Cottagecore Contrast**
+Tuck the baby tee into your *Wide-leg khaki trousers*, and cinch the waist with the *Brown leather belt*. Throw on the *Vintage black denim jacket* and ground the look with your *Black combat boots* for an effortless mix of sweet and edgy!
+
+  Fit card: Found this cute little Y2K butterfly baby tee scrolling on depop and I am obsessed. It was only $18.00 and gives off major 2000s pop star off-duty energy. Can't wait to pair it withbaggy denim and chunky sneakers for running errands.
+
+0 model calls this session, 2 served from cache
 
 ```
 $ python app.py ask '...'
@@ -97,17 +110,27 @@ $ python app.py ask '...'
 **The three tools, tested one at a time**
 
 ```
-$ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
+python -c "from tools import search_listings; r = search_listings('graphic tee', max_price=30); print([(x['title'], x['price'], x['size']) for x in r])"
+[('Graphic Tee — 2003 Tour Bootleg Style', 24.0, 'L'), ('Y2K Baby Tee — Butterfly Print', 18.0, 'S/M'), ('Vintage Band Tee — Faded Grey', 19.0, 'L'), ('Mesh Long-Sleeve Top — Black', 15.0, 'S/M'), ('Vintage Graphic Hoodie — Faded Black', 26.0, 'L'), ('Low-Rise Cargo Pants — Khaki', 27.0, 'W29')]
 
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
+python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+Hey friend! These vintage Levi's are a thrift-store holy grail. Since they’re a classic medium wash, they'll bring a great casual contrast to your existing dark-wash denim. Here are two ways tostyle them:
+
+**Look 1: Effortless Streetwear**
+Tuck your **White ribbed tank top** into the Levi's, add the **Brown leather belt**, and layer the **Vintage black denim jacket** on top. Finish with your **Chunky white sneakers** and the **Black crossbody bag** for an easy, timeless weekend vibe.
+
+**Look 2: Cozy Grunge**
+Pair the jeans with your **Oversized grey crewneck sweatshirt** half-tucked in. Cinch the waist with the **Brown leather belt**, lace up your **Black combat boots**, and throw on the **Black crossbody bag** for a cool, textured contrast.
 
 ```
 
+
 ```
-$ python -c "from tools import create_fit_card; ..."
+python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
+Found my absolute dream medium wash 501s on Depop and I'm still not over it. The fading is so perfectly broken in and they honestly fit like a glove. Paid $38.00 for them which feels like a total steal for actual vintage denim. Can’t wait to live in these with a crisp white tee and beat-up sneakers all fall.
 
 ```
 
@@ -115,24 +138,17 @@ $ python -c "from tools import create_fit_card; ..."
 
 ## How I Used AI
 
-<!-- Two specific moments. What you asked, what came back, what you changed.
-
-     "I used Claude to help me code" is not enough.
-
-     "I gave Claude my search_listings spec. It returned None on no match
-     instead of an empty list, so I changed it" is the level we want. -->
-
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* A search_listings function that filters by price and size and ranks listings by keyword matches.
+- *What came back:* It ran, but every matching listing got the same score, so results came out in price order. A mesh top ranked above the graphic tee when I searched "graphic tee."
+- *What I changed:* I made words that appear in a listing's title count double. After that the Graphic Tee ranked first. I also tested that size "M" returns the S/M listings and not the XL flannel.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Code for suggest_outfit, create_fit_card and the planning loop in agent.py.
+- *What came back:* Code that gave IndentationError when I pasted it in, and a query parser that left the word "under" in the no-results message.
+- *What I changed:* I fixed the spacing by hand and corrected the price pattern in _parse_query. I then ran both paths and checked that the id in session["selected_item"] matched the id suggest_outfit received. For criteria.md, I chose the targets and Claude wrote the wording and the reasons.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
