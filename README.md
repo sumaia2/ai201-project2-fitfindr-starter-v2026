@@ -30,15 +30,7 @@ FitFindr takes a plain-language thrifting request such as "a vintage graphic tee
 
 ## Tool Inventory
 
-<!-- Four lines per tool. This is worth 2 points and it's the single most
-     common place students lose them.
 
-     "Returns a list" earns NOTHING. The description has to say what is IN
-     the list.
-
-     The empty case isn't optional either — it's the thing your loop branches
-     on, and if you don't decide it here you'll discover it as a crash in
-     Milestone 5. -->
 
 ### `search_listings`
 
@@ -59,7 +51,7 @@ An empty list `[]`, never None and never an exception.
 
 ### `create_fit_card`
 
--**What it does:** Writes a short caption someone would post about the find.
+- **What it does:** Writes a short caption someone would post about the find.
 - **Inputs:** `outfit` (str, the output of suggest_outfit), `new_item` (dict, one listing).
 - **Returns:** A string of two to four sentences that mentions the item, its price and its platform once each. It leaves the brand out when `brand` is None. Wording differs between runs because it calls the model.
 - **When it has nothing:** If `outfit` is empty or only whitespace, it returns a descriptive message saying no outfit was provided. It does not raise.
@@ -87,7 +79,12 @@ An empty list `[]`, never None and never an exception.
      1. One FULL query and its output, pasted as text.
      2. Your three per-tool terminal tests — the command and what it printed. -->
 
+
 **One full query**
+
+```
+$ python app.py ask 'vintage graphic tee under $30, size M'
+
 Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
 
   Outfit:   Hey babe! That Y2K butterfly baby tee is a total steal. Here are two cute ways to style it with your closet:
@@ -101,10 +98,6 @@ Tuck the baby tee into your *Wide-leg khaki trousers*, and cinch the waist with 
   Fit card: Found this cute little Y2K butterfly baby tee scrolling on depop and I am obsessed. It was only $18.00 and gives off major 2000s pop star off-duty energy. Can't wait to pair it withbaggy denim and chunky sneakers for running errands.
 
 0 model calls this session, 2 served from cache
-
-```
-$ python app.py ask '...'
-
 ```
 
 **The three tools, tested one at a time**
