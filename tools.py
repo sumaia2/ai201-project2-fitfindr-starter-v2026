@@ -24,6 +24,8 @@ import config  # noqa: F401 — you'll use this in search_listings
 from generate import generate
 from utils.data_loader import load_listings
 
+last_received_id = None  # set by suggest_outfit, so a test can see which item it received
+
 
 # ── Tool 1: search_listings ───────────────────────────────────────────────────
 _STOPWORDS = {
@@ -151,8 +153,40 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
     Test it from a terminal before you move on:
         python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
     """
-    # TODO: replace this with your implementation
-    return ""
+    global last_received_id
+    last_received_id = new_item.get("id")
+
+    item_desc = (
+        f"{new_item['title']} (${new_item['price']}, {new_item['category']}, "
+        f"colors: {', '.join(new_item['colors'])}, "
+        f"style: {', '.join(new_item['style_tags'])})"
+    )
+    items = (wardrobe or {}).get("items", [])
+
+    if not items:
+        prompt = (
+            f"A shopper is considering this thrifted item: {item_desc}.\n"
+            "They haven't told us what they own. Give general styling advice: "
+            "one or two outfit ideas using common pieces most people have. "
+            "Be specific and keep it under 120 words."
+        )
+    else:
+        owned = "\n".join(
+            f"- {w['name']} ({w['category']}; {', '.join(w['colors'])}): {w.get('notes', '')}"
+            for w in items
+        )
+        prompt = (
+            f"A shopper is considering this thrifted item: {item_desc}.\n\n"
+            f"Here is what they already own:\n{owned}\n\n"
+            "Suggest one or two outfits that combine the new item with pieces "
+            "from that list. Name each piece you use exactly as it is listed. "
+            "Keep it under 120 words."
+        )
+
+    text = generate(
+        prompt, system="You are a friendly thrift-store stylist. Be specific and concise."
+    ).strip()
+    return text or "Pair it with simple basics in a neutral color and let it be the focus."
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────
@@ -191,5 +225,22 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
     Test it from a terminal before you move on:
         python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
     """
-    # TODO: replace this with your implementation
-    return ""
+    if not outfit or not outfit.strip():
+        return "No outfit was provided, so there is no fit card to write."
+
+    brand = new_item.get("brand")
+    brand_line = f"Brand: {brand}\n" if brand else ""
+    prompt = (
+        "Write a short social media caption, 2 to 4 sentences, about a thrifted find. "
+        "Sound like a real person posting, not a product description. "
+        "Mention the item, its price, and the platform once each, and be specific "
+        "about the vibe. Do not use hashtags and never write the word None.\n\n"
+        f"Item: {new_item['title']}\n"
+        f"Price: ${new_item['price']:.2f}\n"
+        f"Platform: {new_item['platform']}\n"
+        f"{brand_line}"
+        f"Outfit idea: {outfit}\n"
+    )
+    return generate(
+    prompt, system="You write casual, specific thrift-haul captions."
+    ).strip()
