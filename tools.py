@@ -19,13 +19,26 @@ type, exactly what it returns, and what it returns when it has nothing to give.
 That last line is what your loop branches on. "Returns a list" earns nothing —
 the description has to say what is *in* the list.
 """
-
+import re
 import config  # noqa: F401 — you'll use this in search_listings
 from generate import generate
 from utils.data_loader import load_listings
 
 
 # ── Tool 1: search_listings ───────────────────────────────────────────────────
+_STOPWORDS = {
+    "a", "an", "the", "for", "in", "under", "size", "looking", "i", "want",
+    "and", "with", "of", "to", "me", "need", "find", "below", "less", "than",
+}
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+def _size_tokens(size: str) -> set[str]:
+    # "S/M" -> {"S", "M"}; "XL (oversized)" -> {"XL", "OVERSIZED"}
+    return {t for t in re.split(r"[\s/()]+", size.upper()) if t}
 
 def search_listings(
     description: str,
@@ -78,8 +91,34 @@ def search_listings(
     Test it from a terminal before you move on:
         python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
     """
-    # TODO: replace this with your implementation
-    return []
+    wanted = _words(description) - _STOPWORDS
+    scored = []
+
+    for listing in load_listings():
+        if max_price is not None and listing["price"] > max_price:
+            continue
+        if size and size.upper() not in _size_tokens(listing["size"]):
+            continue
+
+        haystack = _words(
+            " ".join(
+                [
+                    listing["title"],
+                    listing["description"],
+                    listing["category"],
+                    listing["brand"] or "",
+                    " ".join(listing["style_tags"]),
+                    " ".join(listing["colors"]),
+                ]
+            )
+        )
+        title_words = _words(listing["title"])
+        score = len(wanted & haystack) + len(wanted & title_words)
+        if score > 0:
+            scored.append((score, listing))
+
+    scored.sort(key=lambda pair: (-pair[0], pair[1]["price"]))
+    return [listing for _, listing in scored][: config.SEARCH_RESULT_LIMIT]
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
