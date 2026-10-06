@@ -20,27 +20,10 @@
 
 ---
 
-<!-- ─────────────────────────────────────────────────────────────────────────
-     HOW TO USE THIS FILE
-
-     This is your submission. Fill each section in as you finish the milestone
-     it belongs to — don't leave it all to the end.
-
-     Unit 3 asks for the first five sections. Unit 4 adds the five below them.
-     Leave the unit 4 sections alone until then; they're here so you know
-     what's coming.
-
-     Everything is pasted as TEXT. No screenshots, no images, no video links.
-     A typed block of output gets full credit; a picture of the same output
-     gets none.
-     ───────────────────────────────────────────────────────────────────────── -->
-
-<!-- ═══════════════════════ UNIT 3 — THE BUILD ═══════════════════════ -->
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
+FitFindr takes a plain-language thrifting request such as "a vintage graphic tee under $30, size M". It searches a file of 40 secondhand listings, picks the best match, suggests outfits that combine it with items the user already owns, and writes a short caption the user could post. If nothing matches, it stops and tells the user what to change instead of guessing.
 
 
 ---
@@ -60,46 +43,40 @@
 ### `search_listings`
 
 - **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
+Finds listings that match a description, optionally limited by size and a price ceiling.
+- **Inputs:** `description` (str), `size` (str or None), `max_price` (float or None).
 - **Returns:**
+A list of full listing dicts (id, title, description, category, style_tags, size, condition, price, colors, brand, platform), best match first, at most config.SEARCH_RESULT_LIMIT items. A listing's score is the number of words from `description` that appear in its title, description, style_tags, category, colors or brand. Listings scoring zero are dropped. A size matches when the requested size, uppercased, equals one of the listing's size tokens, where the size string is split on spaces, slashes and parentheses. So "M" matches "S/M" and "M", but "L" does not match "XL (oversized)", and "S" does not match "US 9". `max_price` is inclusive. A size or price of None skips that filter.
 - **When it has nothing:**
+An empty list `[]`, never None and never an exception.
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Suggests one or two outfits that combine the thrifted item with pieces the user already owns.
+- **Inputs:** `new_item` (dict, one listing), `wardrobe` (dict with an `items` key holding a list of wardrobe item dicts).
+- **Returns:** A non-empty string of outfit suggestions that name specific wardrobe pieces by their `name`.
+- **When it has nothing:** If `wardrobe["items"]` is empty, it returns a non-empty string of general styling advice for the item. It does not raise and does not return an empty string.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+-**What it does:** Writes a short caption someone would post about the find.
+- **Inputs:** `outfit` (str, the output of suggest_outfit), `new_item` (dict, one listing).
+- **Returns:** A string of two to four sentences that mentions the item, its price and its platform once each. It leaves the brand out when `brand` is None. Wording differs between runs because it calls the model.
+- **When it has nothing:** If `outfit` is empty or only whitespace, it returns a descriptive message saying no outfit was provided. It does not raise.
 
 ---
 
 ## Planning Loop
 
-<!-- Your branch rule, stated as a rule — the condition AND both paths — plus
-     the file and function that holds it.
 
-     Like this:
-       "If search_listings returns an empty list, put a message in the session
-        and stop. Otherwise take the first result and go to suggest_outfit."
-        — agent.py::run_agent
 
-     The grader checks your code against what you claim here, so the file and
-     function have to be real. -->
-
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` that names what the user could change (raise the price, drop the size, or use different words), leave `session["fit_card"]` as None, and return without calling `suggest_outfit`. Otherwise, set `session["selected_item"]` to the first result and continue to `suggest_outfit`, then `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
 **How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** `query`, then `parsed` (description, size, max_price), then `search_results`, then `selected_item`, then `outfit_suggestion`, then `fit_card`. `error` is set only when the run ends early.
 
 ---
 
