@@ -25,9 +25,12 @@ Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+My search is a plain keyword match, so a phrasing like "t-shirt" can miss a
+listing that says "tee", and the mixed size formats in my data (S/M,
+W30 L30, XL (oversized)) can make the size filter drop a listing the user
+would want. Two of the three tools also call the model, which can be rate
+limited or fail. 4 of 5 leaves room for one of those without making the
+target too easy to hit.
 
 ---
 
@@ -37,8 +40,10 @@ Given a query that matches no listings, the agent stops before calling
 `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+This decision is a plain code check on whether search_listings returned an
+empty list, so the model is not involved and the same query behaves the
+same way every time. If it ever fails, that's a bug in my branch, not
+randomness, so anything below 5 of 5 would hide a real problem.
 
 ---
 
@@ -51,7 +56,10 @@ In 5 of 5 tries on a query that matches at least one listing, the `id` in
 
 
 **Why this target:**
-
+The selected item moves through a plain Python dict (the session), and no
+model touches that step. The only way for the ids to differ is a coding
+bug, such as picking the wrong list position or overwriting the item, so I
+expect every try to match.
 
 
 ---
@@ -66,7 +74,10 @@ the text "None", and (d) is between 2 and 4 sentences long.
 
 **Why this target:**
 
-
+The model writes the caption, so wording changes between runs. It might
+write "24 bucks" instead of "$24", or run past four sentences even when my
+prompt asks for fewer. 4 of 5 allows one off-run from that without making
+the target so loose that I can't miss it.
 
 ---
 
@@ -78,7 +89,10 @@ whose `price` is at or below that ceiling.
 
 **Why this target:**
 
-
+The price filter is a plain comparison (price <= max_price) on a float
+field, so the model is not involved. A $45 jacket showing up on a $30
+search is an error a user spots at once, and a deterministic filter should
+never let it through.
 
 ---
 
