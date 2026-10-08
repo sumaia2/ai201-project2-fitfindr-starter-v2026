@@ -143,141 +143,95 @@ Found my absolute dream medium wash 501s on Depop and I'm still not over it. The
 - *What came back:* Code that gave IndentationError when I pasted it in, and a query parser that left the word "under" in the no-results message.
 - *What I changed:* I fixed the spacing by hand and corrected the price pattern in _parse_query. I then ran both paths and checked that the id in session["selected_item"] matched the id suggest_outfit received. For criteria.md, I chose the targets and Claude wrote the wording and the reasons.
 
-<!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
+**Unit 4**
 
-     Don't fill these in during unit 3.
-     ═══════════════════════════════════════════════════════════════════ -->
+- *What I asked for:* Help moving `search_listings` onto MCP, adding a loop trace, running the five-try test, and fixing the one miss.
+- *What came back:* Step-by-step edits for `mcp_server.py`, `agent.py` and the `create_fit_card` prompt, plus small scripts (`check_criteria.py`, `check_cards.py`) to score criteria the run log doesn't record.
+- *What I changed:* I ran every command and checked each result myself. I read the fit cards to count criterion 4, and I swapped the `dress under $25` scenario for `hoodie under $40` when it returned nothing and so tested nothing.
 
 ---
 
 ## Run Log — Before
 
-<!-- Five criteria, five tries each, in this exact format.
-
-     Five, because your criteria are written out of five. Mark each try PASS
-     or FAIL, count the passes, and read that count against your target — a
-     row targeting 4 of 5 with three PASS cells is MISSED (3/5).
-
-     `python run_eval.py --label before` runs everything and writes the table
-     into results/. Paste it here and fill in the verdicts. -->
+Produced by `run_eval.py::main` (results/run_2026-10-07_2015_before.md), cache off, 5 tries each. Criteria 3 and 5 were scored with `check_criteria.py`, because the run log does not record the id that `suggest_outfit` received or every returned price. Criterion 4 was scored with `check_cards.py`. Rule for criterion 4(a): the price counts only if `$19` appears as a number, so "nineteen bucks" fails.
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. selected_item id matches id suggest_outfit received | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card has price, platform, no "None", 2-4 sentences | 4 of 5 | FAIL | FAIL | FAIL | FAIL | PASS | MISSED (1/5) |
+| 5. Price ceiling respected (5 queries) | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
-
-```
+Real output (`tools.py::create_fit_card`, results/run_2026-10-07_2015_before.md, fit card scenario, try 1):
 
 ```
+Scored this faded grey vintage band tee on depop for nineteen dollars and honestly, I'm never taking it off. The cotton is butter-soft and has that perfect 90s grunge fade you just can't fake. Can't wait to beat it up with combat boots and oversized denim all fall.
+```
 
----
+Real output (`check_criteria.py`, criterion 3, try 1): `lst_033 vs lst_033 -> PASS`
+
+One note on criterion 5: in the before run, the scenario `dress under $25` returned no listings, so it tested nothing. The criterion 5 row above uses `check_criteria.py`, where all five queries returned results.
+
+
 
 ## Verdicts and Diagnoses
 
-<!-- MET or MISSED per criterion against LAST UNIT's target, plus a sentence on
-     how you decided.
-
-     Then, for every miss: which of the four places it happened — a tool, the
-     loop's branch, the session, or the model's output — AND the mechanism.
-
-     Not a diagnosis:  "The fit card was bad."
-     A diagnosis:      "The fit card criterion missed on 2 of 5 items. Both had
-                        an empty brand field. My prompt puts the brand in the
-                        first sentence, so the card opened with a blank and read
-                        like a fragment. The tool worked; the prompt assumed a
-                        field that isn't always there."
-
-     Look for a pattern. Three misses on the same tool is one problem, not
-     three. -->
+Verdicts are read against the targets in `criteria.md`, written in Unit 3. Counts come from the before run (`results/run_2026-10-07_2015_before.md`). Rule for criterion 4(a): the price counts only if `$19` appears as a number.
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools | 4 of 5 | MET (5/5) | All five tries ran all three tools and returned a fit card. |
+| 2 | Impossible query stops before suggest_outfit | 5 of 5 | MET (5/5) | All five tries stopped at the branch; the trace shows suggest_outfit never ran. |
+| 3 | selected_item id matches id suggest_outfit received | 5 of 5 | MET (5/5) | `check_criteria.py` printed `lst_033 vs lst_033` in all five tries. |
+| 4 | Fit card has price, platform, no "None", 2-4 sentences | 4 of 5 | MISSED (1/5) | `check_cards.py` found the price as a number in only 1 of 5 cards; the other three checks passed in all five. |
+| 5 | Price ceiling respected across 5 queries | 5 of 5 | MET (5/5) | All five queries returned results and none had a price over its ceiling. |
 
 **Diagnoses**
 
+**Criterion 4 (the only miss).** The failing place is the model's output in `tools.py::create_fit_card`. In tries 1 to 4 the card wrote the price in words ("nineteen dollars", "nineteen bucks"), so part (a) failed. Platform, no "None" and 2-4 sentences passed in every try. The search and the loop worked: the right item reached the tool each time. The cause is the prompt: it said to mention the price but never said to write it as digits, so the model chose words or digits at random across runs. With only one miss there is no pattern across tools. This is one prompt problem, which is what the improvement below fixes.
+
+No criteria were revised. `criteria.md` is unchanged.
 
 
 ---
 
 ## Loop Trace
 
-<!-- One full run, printed step by step, with the MCP call visible in it.
-
-     `python app.py ask '...' --trace` once you've added the trace.step()
-     calls in Milestone 2.
-
-     Worth pasting BOTH the happy path and the empty-search path. The empty
-     one should be visibly shorter, because it stops. If your two traces are
-     the same length, your branch isn't working — and this is the fastest way
-     anyone will ever find that out. -->
-
-**Happy path**
+Command: `python app.py ask 'vintage graphic tee under $30' --trace`
 
 ```
-
+[1] parse query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Vintage Band Tee — Faded Grey, Graphic Tee — 2003 Tour Bootleg Style, Y2K Baby Tee — Butterfly Print … +7 more
+[3] select item
+      out: Vintage Band Tee — Faded Grey ($19.0, depop)
+      →    first result chosen
+[4] suggest_outfit
+      in:  Vintage Band Tee — Faded Grey ($19.0, depop)
+      out: Hey friend! That faded band tee is an absolute score. Here are two ways to style it using what’s already in yo…
+[5] create_fit_card
+      in:  Vintage Band Tee — Faded Grey ($19.0, depop)
+      out: Scored this perfectly faded vintage band tee on depop for $19 and I am so obsessed with how soft it is. Ithas…
 ```
-
-**Empty search**
-
-```
-
-```
-
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
-
 
 
 ---
 
-## The Improvement
 
-<!-- What you changed, why your diagnosis pointed at it, and the after-run in
-     the same table format. One change, measured properly.
-
-     `python run_eval.py --label after` -->
-
-**What I changed:**
-
-**Which failure it was meant to fix:**
-
-### Run Log — After
-
-| Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
-|---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
-
-**Did it help, and how do I know:**
-
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
-
-
-
----
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+All five criteria met their targets in the after run, so nothing is left to diagnose. These are the things I would still tighten or fix:
+
+- **Criterion 1's target was too easy.** It passed 5 of 5 in both runs, so I would raise it from 4 of 5 to 5 of 5.
+- **Keyword search is brittle.** `dress under $25` returned nothing even though dresses may exist under other wording, and "t-shirt" can miss a listing that says "tee". I would add simple synonyms.
+- **`suggest_outfit` sometimes writes prices in words.** One before-run outfit text said "nineteen bucks", and the fit card could copy that. I did not fix it because the unit allows one improvement.
+- **The fit card check is narrow.** It only accepts `$19`, so a card that says "19 dollars" would fail even though the price is there. I kept the rule fixed so the before and after runs could be compared.
+
 
 
 
@@ -318,3 +272,32 @@ full. -->
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
+## Failure modes triggered on purpose
+
+- **Empty search** (`designer ballgown size XXS under $5`): `No listings matched 'designer ballgown'. You could raise your price limit above $5, or drop the size filter (XXS), or try different or fewer keywords.`
+- **Empty wardrobe** (`--empty-wardrobe`): the agent returned general styling advice using basics the user likely owns, and a normal fit card. No crash and no blank.
+- **Model unavailable** (one character of the key removed): `ModelUnavailable: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.` No stack trace and no hang. The key was restored afterwards and `test.py` passed again.
+
+## The MCP move
+
+I moved `search_listings` onto MCP. In `mcp_server.py` it is registered with typed inputs and a description that states the empty case. In `agent.py::run_agent` the direct call became `call_tool("search_listings", {...})`. Behavior was unchanged: the same queries returned the same items, and the empty case still returned `[]`. The only visible difference is that each call is slower, because the server starts on every call.
+
+## The Improvement
+
+**Change:** one sentence added to the `create_fit_card` prompt in `tools.py`: "Write the price as a number with a dollar sign, like $19 or $19.00, and never spell it out in words (not 'nineteen bucks')."
+
+**Why:** it targets the one diagnosed failure, criterion 4(a), where the model spelled out the price in 4 of 5 tries. Nothing else in the agent changed. I also swapped the criterion 5 scenario `dress under $25` for `hoodie under $40`, because the dress search returned nothing and an empty result cannot test a price ceiling. That swap does not affect criterion 4.
+
+## Run Log — After
+
+Produced by `run_eval.py::main` (results/run_2026-10-07_2112_after.md), same settings. Criteria 3 and 5 re-run with `check_criteria.py`.
+
+| Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
+|---|---|---|---|---|---|---|---|
+| 1. Matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. selected_item id matches id suggest_outfit received | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card has price, platform, no "None", 2-4 sentences | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Price ceiling respected (5 queries) | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+**Did it help?** Yes. Criterion 4 went from 1 of 5 to 5 of 5 (`check_cards.py` on both files), and the other four criteria were unchanged. This is one run of five tries, so it is evidence rather than proof, since a model can still ignore an instruction occasionally.
