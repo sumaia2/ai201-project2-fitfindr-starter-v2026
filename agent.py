@@ -131,17 +131,26 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         than a stack trace. The import is already at the top of this file.
     """
     session = new_session(query, wardrobe)
+    trace.start_trace()
     count = 0
 
     count += 1
     trace.check_iterations(count)
     parsed = _parse_query(query)
     session["parsed"] = parsed
-    session["search_results"] = call_tool("search_listings", {
+    trace.step("parse query", inputs=query, returned=parsed)
+
+    search_args = {
         "description": parsed["description"],
         "size": parsed["size"],
         "max_price": parsed["max_price"],
-    })
+    }
+    session["search_results"] = call_tool("search_listings", search_args)
+    trace.step(
+        "search_listings (via MCP)",
+        inputs=search_args,
+        returned=session["search_results"],
+    )
 
     # THE BRANCH: nothing came back, so stop before suggest_outfit.
     if not session["search_results"]:
@@ -156,7 +165,42 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             + ", or ".join(tips)
             + "."
         )
+        trace.step(
+            "branch: empty search",
+            returned=[],
+            note="stopping before suggest_outfit",
+        )
         return session
+
+    session["selected_item"] = session["search_results"][0]
+    trace.step(
+        "select item",
+        returned=session["selected_item"],
+        note="first result chosen",
+    )
+
+    count += 1
+    trace.check_iterations(count)
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"], session["wardrobe"]
+    )
+    trace.step(
+        "suggest_outfit",
+        inputs=session["selected_item"],
+        returned=session["outfit_suggestion"],
+    )
+
+    count += 1
+    trace.check_iterations(count)
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"], session["selected_item"]
+    )
+    trace.step(
+        "create_fit_card",
+        inputs=session["selected_item"],
+        returned=session["fit_card"],
+    )
+    return session
 
     session["selected_item"] = session["search_results"][0]
 
